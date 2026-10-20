@@ -1,0 +1,40 @@
+name: Build WebOS 10 ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use the newest .html file, whatever it is called
+        run: |
+          best=""; bt=0
+          for f in *.html; do
+            t=$(git log -1 --format=%ct -- "$f")
+            if [ "$t" -ge "$bt" ]; then bt=$t; best="$f"; fi
+          done
+          echo "Using: $best"
+          [ "$best" = "WebOS10.html" ] || cp "$best" WebOS10.html
+
+      - name: Build the ISO inside Debian 12
+        run: |
+          docker run --rm --privileged -v "$PWD":/work -w /work debian:bookworm \
+            bash build-webos-iso-v2.sh WebOS10.html
+
+      - name: Show result
+        if: always()
+        run: ls -lh *.iso *.log 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WebOS10-iso
+          path: |
+            WebOS10-boot-arm64.iso
+            webos-build.log
